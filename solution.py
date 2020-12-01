@@ -111,13 +111,28 @@ class NN(object):
             else:
                 cache[f"Z{layer_n}"] = self.softmax(cache[f"A{layer_n}"])
         return cache
-
+    #https://towardsdatascience.com/lets-code-a-neural-network-in-plain-numpy-ae7e74410795
     def backward(self, cache, labels):
         output = cache[f"Z{self.n_hidden + 1}"]
         grads = {}
+        grads[f"dA{self.n_hidden + 1}"] = - (np.divide(labels, output) - np.divide(1 - labels, 1 - output))
+        print(self.hidden_dims)
+        print("Da"+str(self.n_hidden + 1))
         # grads is a dictionnary with keys dAm, dWm, dbm, dZ(m-1), dA(m-1), ..., dW1, db1
         # WRITE CODE HERE
-        pass
+        for layer in range(self.n_hidden+1,0,-1):
+            #- (np.divide(labels, output) - np.divide(1 - labels, 1 - output))
+
+            print(np.shape(grads[f"dA{layer}"]))
+            print(np.shape(self.activation(cache[f"Z{layer}"], grad=True)))
+            grads[f"dZ{layer}"] = grads[f"dA{layer}"] * self.activation(cache[f"Z{layer}"], grad = True)
+            print("DZ"+ str(layer))
+            grads[f"dW{layer}"] = np.dot(grads[f"dZ{layer}"].T,cache[f"A{layer-1}"])/self.batch_size
+            print("dW" + str(layer))
+            grads[f"db{layer}"] = np.sum(grads[f"dZ{layer}"],axis = 1, keepdims=True)/self.batch_size
+            print("Db" + str(layer))
+            grads[f"dA{layer - 1}"] = np.dot(self.weights[f"W{layer}"], grads[f"dZ{layer}"].T)
+            print("Da" + str(layer-1))
         return grads
 
     def update(self, grads):
@@ -132,9 +147,7 @@ class NN(object):
     def loss(self, prediction, labels):
         prediction[np.where(prediction < self.epsilon)] = self.epsilon
         prediction[np.where(prediction > 1 - self.epsilon)] = 1 - self.epsilon
-        y = labels
-        a = self.one_hot(prediction)
-        cost = (- 1/self.batch_size) * np.sum(y*np.log(a)+(13-y)*np.log(1-a))
+        cost = -np.sum(labels*np.log(prediction))/len(prediction)
         return cost
 
     def compute_loss_and_accuracy(self, X, y):
