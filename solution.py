@@ -1,10 +1,10 @@
 import pickle
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 class NN(object):
     def __init__(self,
-                 hidden_dims=(512, 256),
+                 hidden_dims=(512, 120, 120,120,120,120),
                  datapath='cifar10.pkl',
                  n_classes=10,
                  epsilon=1e-6,
@@ -111,28 +111,20 @@ class NN(object):
             else:
                 cache[f"Z{layer_n}"] = self.softmax(cache[f"A{layer_n}"])
         return cache
-    #https://towardsdatascience.com/lets-code-a-neural-network-in-plain-numpy-ae7e74410795
+    
     def backward(self, cache, labels):
         output = cache[f"Z{self.n_hidden + 1}"]
         grads = {}
-        grads[f"dA{self.n_hidden + 1}"] = - (np.divide(labels, output) - np.divide(1 - labels, 1 - output))
-        print(self.hidden_dims)
-        print("Da"+str(self.n_hidden + 1))
         # grads is a dictionnary with keys dAm, dWm, dbm, dZ(m-1), dA(m-1), ..., dW1, db1
-        # WRITE CODE HERE
         for layer in range(self.n_hidden+1,0,-1):
-            #- (np.divide(labels, output) - np.divide(1 - labels, 1 - output))
-
-            print(np.shape(grads[f"dA{layer}"]))
-            print(np.shape(self.activation(cache[f"Z{layer}"], grad=True)))
-            grads[f"dZ{layer}"] = grads[f"dA{layer}"] * self.activation(cache[f"Z{layer}"], grad = True)
-            print("DZ"+ str(layer))
-            grads[f"dW{layer}"] = np.dot(grads[f"dZ{layer}"].T,cache[f"A{layer-1}"])/self.batch_size
-            print("dW" + str(layer))
-            grads[f"db{layer}"] = np.sum(grads[f"dZ{layer}"],axis = 1, keepdims=True)/self.batch_size
-            print("Db" + str(layer))
-            grads[f"dA{layer - 1}"] = np.dot(self.weights[f"W{layer}"], grads[f"dZ{layer}"].T)
-            print("Da" + str(layer-1))
+            if layer == self.n_hidden + 1:
+                grads[f"dA{layer}"] = output - labels
+            else:
+                grads[f"dA{layer}"] = grads[f"dZ{layer}"] * self.activation(cache[f"A{layer}"], grad = True)
+            grads[f"dW{layer}"] = np.dot(cache[f"Z{layer-1}"].T,grads[f"dA{layer}"])/self.batch_size
+            grads[f"db{layer}"] = np.sum(grads[f"dA{layer}"],axis = 0,keepdims=True)/self.batch_size
+            if layer > 1:
+                grads[f"dZ{layer-1}"] = np.dot(grads[f"dA{layer}"], self.weights[f"W{layer}"].T)
         return grads
 
     def update(self, grads):
@@ -170,7 +162,9 @@ class NN(object):
             for batch in range(n_batches):
                 minibatchX = X_train[self.batch_size * batch:self.batch_size * (batch + 1), :]
                 minibatchY = y_onehot[self.batch_size * batch:self.batch_size * (batch + 1), :]
-                # WRITE CODE HERE
+                cache = self.forward(minibatchX)
+                grads = self.backward(cache,minibatchY)
+                self.update(grads)
                 pass
 
             X_train, y_train = self.train
@@ -187,11 +181,31 @@ class NN(object):
 
     def evaluate(self):
         X_test, y_test = self.test
-        # WRITE CODE HERE
-        pass
-        return 0
+        test_loss, test_accuracy, _ = self.compute_loss_and_accuracy(X_test, y_test)
+        return test_loss, test_accuracy
 
     def normalize(self):
         # WRITE CODE HERE
         # compute mean and std along the first axis
         pass
+
+def main():
+    neural_net = NN(seed=0,lr=0.03,batch_size=100,datapath='svhn.pkl')
+    epoch = 31
+    neural_net.train_loop(30)
+    print(neural_net.train_logs['train_accuracy'])
+    print(neural_net.evaluate())
+
+    fig, (ax1, ax2) = plt.subplots(2)
+    ax1.plot(np.arange(1,epoch),neural_net.train_logs['validation_accuracy'],'-r',label = "validation")
+    ax1.plot(np.arange(1,epoch),neural_net.train_logs['train_accuracy'],'-b',label = "train")
+    ax2.plot(np.arange(1,epoch), neural_net.train_logs['validation_loss'], '-r',label="validation")
+    ax2.plot(np.arange(1,epoch), neural_net.train_logs['train_loss'], '-b',label="train")
+    ax1.set_ylabel("Precision")
+    ax2.set_ylabel("Loss")
+    ax1.set_xlabel('Epoch')
+    ax2.set_xlabel('Epoch')
+    ax2.legend(loc="upper right")
+    plt.show()
+if __name__ == "__main__":
+    main()
